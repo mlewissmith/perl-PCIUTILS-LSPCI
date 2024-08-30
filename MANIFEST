@@ -1,0 +1,5 @@
+bin/pciutils_lspci.pl
+lib/PCIUTILS/LSPCI.pm
+Makefile.PL
+MANIFEST
+README
