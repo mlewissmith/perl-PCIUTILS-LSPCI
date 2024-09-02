@@ -1,4 +1,4 @@
-bin/pciutils_lspci.pl
+contrib/pciutils_lspci.pl
 lib/PCIUTILS/LSPCI.pm
 Makefile.PL
 MANIFEST
