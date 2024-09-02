@@ -15,4 +15,14 @@ use PCIUTILS::LSPCI;
 my $obj = PCIUTILS::LSPCI->new;
 my $lspci = $obj->get_lspci;
 
-print Dumper $lspci;
+## Equivalent to `lspci -D -n`
+for my $record (@$lspci) {
+    my $s = $record->{Slot};
+    my $v = $record->{Vendor};
+    my $d = $record->{Device};
+    my $c = $record->{Class};
+    my $r = $record->{Rev};
+    print "$s $c: $v:$d";
+    print " (rev $r)" if defined $r;
+    print "\n";
+}

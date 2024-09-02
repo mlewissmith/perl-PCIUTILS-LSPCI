@@ -7,7 +7,7 @@ package PCIUTILS::LSPCI;
 use strict;
 use warnings;
 
-our $VERSION = '0.0.1';
+our $VERSION = '1.0.0';
 
 =head1 NAME
 
@@ -17,16 +17,24 @@ PCIUTILS::LSPCI - perl postprocess `lspci` output
 
     use PCIUTILS::LSPCI;
 
-    my $obj = PCIUTILS::LSPCI->new;
-    my $lspci = $obj->get_lspci;
+    $obj = PCIUTILS::LSPCI->new;
+    $lspci = $obj->get_lspci;
 
-    for my $device ( sort keys %$lspci ) {
-        ...
+    ## Equivalent to `lspci -D -n`
+    for $record (@$lspci) {
+        $s = $record->{Slot};
+        $v = $record->{Vendor};
+        $d = $record->{Device};
+        $c = $record->{Class};
+        $r = $record->{Rev};
+        print "$s $c: $v:$d";
+        print " (rev $r)" if defined $r;
+        print "\n";
     }
 
 =head1 DESCRIPTION
 
-TBD
+Provide perl interface to PCI information as returned by B<lspci(1)>.
 
 =cut
 
@@ -59,14 +67,7 @@ sub new {
 
 =item B<< get_lspci >>
 
-Parsed output from C<lspci -n -vmm>, returned as hashref:
-
-    {
-        'HEX:HEX' => [ { 'tag' => 'value' }, ... ]
-    }
-
-Note: primary key is C<< $pcivendor:$pcidevice >> containg array of B<< lspci >>
-tag:value pairs, one per device installed.
+Parsed output from C<lspci>, returned as arrayref:
 
 Note: the B<lspci> hash is built at contruction time, see L</Internals>.
 
@@ -93,29 +94,38 @@ sub get_lspci {
 
 =item B<< _lspci >>
 
-Run C<< lspci -vmm -n >>, parse, return hashref.
+Run C<< lspci -D -n -vmm >>, parse, return arrayref.
 
 =cut
 
 sub _lspci {
-    my %devices = ();
-    my %device = ();
-    for my $line ( qx[lspci -vmm -n] ) {
+    my @devices = ();
+
+    my %record = ();
+    ## See lspci(1)
+    ##  -vmm : machine-readable
+    ##  -n   : vendor/device codes as numbers
+    ##  -D   : show all domain numbers
+    for my $line ( qx[lspci -D -n -vmm] ) {
         chomp $line;
         if (length($line)) {
             if ($line =~ m{^(\S+):\s*(\S+)\s*$}) {
-                $device{$1} = $2;
+                $record{$1} = $2;
             }
         } else {
             ## blank line terminates record
-            push @{ $devices{"$device{Vendor}:$device{Device}"} }, {%device};
-            %device = ();
+            push @devices, {%record};
+            %record = ();
         }
     }
-    return \%devices;
+    return \@devices;
 }
 
 =back
+
+=head1 SEE ALSO
+
+B<< lspci(1) >>
 
 =cut
 
