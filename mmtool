@@ -1,0 +1,310 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+mmtool - build helper
+
+=head1 SYNOPSIS
+
+B<mmtool> I<COMMAND> [I<ARGS>]
+
+=head2 Basic
+
+  $ ./mmtool build
+  $ ./mmtool release [TAG]
+
+=head2 Advanced
+
+  $ ./mmtool configure
+  $ ./mmtool make [ARGS...]
+  $ ./mmtool changelog [TAG]
+  $ ./mmtool tag [TAG]
+  $ ./mmtool clean
+
+=head1 DESCRIPTION
+
+Build helper for perl package B<PCIUTILS::LSPCI>.
+
+=cut
+
+use strict;
+use warnings;
+use feature 'say';
+
+use FindBin qw/$Bin $Script/;
+use lib "$Bin/blib", "$Bin/lib";
+
+use File::Temp 'tempfile';
+use File::Which;
+use Pod::Usage;
+
+use PCIUTILS::LSPCI;
+our $pmversion = version->parse($PCIUTILS::LSPCI::VERSION)->normal;
+
+# per released https://github.com/mlewissmith/perl-MODULE.boilerplate
+our $mmtool_vernum = "0.1.0";
+our $mmtool_verstr = "${Script}-${mmtool_vernum}+${pmversion}";
+
+our $quiet = $ENV{QUIET};
+
+our %commands = (
+    build     => \&mmtool_build,
+    changelog => \&mmtool_changelog,
+    clean     => \&mmtool_clean,
+    configure => \&mmtool_configure,
+    make      => \&mmtool_make,
+    release   => \&mmtool_release,
+    tag       => \&mmtool_tag,
+    help      => sub { pod2usage(-message => $mmtool_verstr, -verbose => 1) },
+    man       => sub { pod2usage(-message => $mmtool_verstr, -verbose => 2) },
+    version   => sub { say $mmtool_verstr },
+    );
+
+
+################################################################################
+################################################################################
+
+chdir $Bin;
+@ARGV or pod2usage( -message => join('',
+                                     'COMMAND=[',
+                                     join('|',sort keys %commands),
+                                     ']') );
+
+die unless -d    '.git';
+die unless which 'git';
+die unless which 'git-changelog';
+
+my $cmd = shift @ARGV;
+$commands{$cmd}?$commands{$cmd}(@ARGV):die;
+exit;
+
+################################################################################
+################################################################################
+################################################################################
+################################################################################
+
+sub qsay        { say join(' ', "[$mmtool_verstr]", @_) unless $quiet}
+sub qsay_qx     { qsay(@_) && return qx(@_) }
+sub qsay_system { qsay(@_) && return system(@_) }
+
+sub mmtool_configure { qsay_system( qw/perl Makefile.PL/, @_ ) && die }
+sub mmtool_make      { qsay_system( qw/make/, @_ )             && die }
+sub mmtool_clean     { qsay_system( qw/git clean -xdf/ )       && die }
+
+sub mmtool_build {
+    mmtool_configure( qw/INSTALLDIRS=vendor NO_PACKLIST=1 NO_PERLLOCAL=1 NO_META=1 NO_MYMETA=1/ );
+    mmtool_make("all");
+}
+
+sub mmtool_release {
+    my $tag = shift;
+    mmtool_make("dist");
+    mmtool_tag($tag);
+}
+
+sub mmtool_changelog {
+    my $ftag = shift;
+    prompt("EXPERIMENTAL...");
+    if ($ftag) {
+        git_changelog( '--prune-old',
+                       '--final-tag' => ${ftag},
+                       'CHANGELOG' );
+    } else {
+        git_changelog( '--list',
+                       'CHANGELOG' );
+    }
+}
+
+sub mmtool_tag {
+    my $tagnow = [git_describe()]->[0]||'';
+    my $newtag = shift || prompt("# latest tag: ${tagnow}\n# pmversion: ${pmversion}\ntag? ");
+    die unless $newtag;
+    my $tags = git_tag_list();
+    die if $tags->{$newtag};
+    my ($tmpfh, $tmpnam) = tempfile(UNLINK => 1);
+    git_changelog( '--prune-old',
+                   '--tag' => $newtag,
+                   $tmpnam );
+    my @changelog = <$tmpfh>;
+    writefile( $tmpnam,
+               "$pmversion\n",
+               @changelog );
+    git_tag( '-F' => $tmpnam, $newtag );
+}
+
+################################################################################
+## git functions
+
+sub git_changelog { qsay_system( qw/git changelog --no-merges/, @_ ) && die }
+sub git_tag       { qsay_system( qw/git tag/, @_ )                   && die }
+
+sub git_tag_list {
+    my @tags = qsay_qx( qw/git tag --list/ );
+    chomp @tags;
+    return @tags if wantarray;
+    my %tags;
+    map { $tags{$_} = $_ } @tags;
+    return \%tags;
+}
+
+sub git_describe {
+    my $desc = qsay_qx( qw/git describe/ ) || return undef;
+    chomp $desc;
+    return $desc unless wantarray;
+    my @f = split('-', $desc);
+    $f[2] =~ s/^g// if $f[2];
+    return @f;
+}
+
+################################################################################
+## utility functions
+
+sub prompt {
+    my $p = shift;
+    print $p;
+    my $r = readline(STDIN);
+    chomp $r;
+    return $r;
+}
+
+sub writefile {
+    my $outfile = shift;
+    open( my $fh, '>', $outfile ) or die;
+    print $fh $_ for @_;
+    close $fh or die;
+}
+
+sub appendfile {
+    my $outfile = shift;
+    open( my $fh, '>>', $outfile ) or die;
+    print $fh $_ for @_;
+    close $fh or die;
+}
+
+sub touchfile {
+    my $outfile = shift;
+    appendfile($outfile);
+}
+
+__END__
+
+## Documentation style-guides:
+## + man-pages(7)
+## + perlpod(1)
+## + Pod::Usage(3)
+
+
+=for HEAD1 #####################################################################
+################################################################################
+
+=head1 ARGUMENTS
+
+=over
+
+=item B<build>
+
+Configure and make without cruft per
+L<[1]|/https://metacpan.org/pod/ExtUtils::MakeMaker>
+and
+L<[3]|/https://fedoraproject.org/wiki/Perl/Tips>:
+
+  $ perl Makefile.PL INSTALLDIRS=vendor NO_PACKLIST=1 NO_PERLLOCAL=1 NO_META=1 NO_MYMETA=1
+  $ make all
+
+
+=for ITEM ######################################################################
+################################################################################
+
+=item B<release>
+
+=item B<release> [I<TAG>]
+
+Make release tarball, apply git annotated tag.  See L</tag>.
+
+  $ make dist
+  $ git tag ...
+
+
+=for ITEM ######################################################################
+################################################################################
+
+=item B<changelog>
+
+=item B<changelog> I<TAG>
+
+I<EXPERIMENTAL>.  Manage B<CHANGELOG> file.  See B<< L<git-changelog> >>(1).
+
+    new changelog from TAG
+  $ ./mmtool changelog TAG
+    ...git activity...
+    ...update changelog
+  $ ./mmtool changelog
+
+
+=for ITEM ######################################################################
+################################################################################
+
+=item B<tag>
+
+=item B<tag> I<TAG>
+
+Apply B<git> annotated tag I<TAG>, prompt for I<TAG> if not provided.
+Tag message is latest changelog.
+
+
+=for ITEM ######################################################################
+################################################################################
+
+=item B<help>
+
+=item B<man>
+
+=item B<version>
+
+Documentation.
+
+=back
+
+
+=for HEAD1 #####################################################################
+################################################################################
+
+=head1 ENVIRONMENT
+
+=over
+
+=item B<QUIET>=0|1
+
+=back
+
+
+=for HEAD1 #####################################################################
+################################################################################
+
+=head1 AUTHORS/BUGS/COPYRIGHT
+
+... for I<this> script B<mmtool>.
+
+Canonical source at L<https://github.com/mlewissmith/perl-MODULE.boilerplate>
+
+Report bugs at L<https://github.com/mlewissmith/perl-MODULE.boilerplate/issues>
+
+
+=for HEAD1 #####################################################################
+################################################################################
+
+=head1 SEE ALSO
+
+=over
+
+=item [1] L<https://metacpan.org/pod/ExtUtils::MakeMaker>
+
+=item [2] L<https://docs.fedoraproject.org/en-US/packaging-guidelines/Perl/>
+
+=item [3] L<https://fedoraproject.org/wiki/Perl/Tips>
+
+=item [4] L<https://semver.org/>
+
+=back
+
+=cut
