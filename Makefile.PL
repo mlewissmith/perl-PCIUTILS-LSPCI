@@ -8,11 +8,37 @@ use strict;
 use warnings;
 use ExtUtils::MakeMaker;
 
-WriteMakefile(
-    NAME                => 'PCIUTILS::LSPCI',
-    AUTHOR              => 'Magnus Lewis-Smith <ccsgac@csc.warwick.ac.uk>',
-    VERSION_FROM        => 'lib/PCIUTILS/LSPCI.pm',
-    ABSTRACT_FROM       => 'lib/PCIUTILS/LSPCI.pm',
-    LICENSE             => 'unrestricted',
-    EXE_FILES           => [ glob "./bin/*" ],
-);
+use Data::Dumper;
+
+my $pmname = 'PCIUTILS::LSPCI';
+my $pmfile = 'lib/PCIUTILS::LSPCI.pm';
+my %pl_files;
+
+## Distribution files which can be built *without* appealing to git
+$pl_files{'DISTFILES.PL'} = {
+    README  => [$pmfile],
+    VERSION => [$pmfile],
+    CHANGELOG => [],
+};
+
+sub MY::postamble {
+    my @makefile;
+
+    ## define dummy target for DISTFILES
+    my $distfiles = join(' ', sort keys %{ $pl_files{'DISTFILES.PL'} } );
+    push @makefile, <<"__DISTFILES__";
+.PHONY: DISTFILES
+DISTFILES: $distfiles
+__DISTFILES__
+
+    return join("\n", @makefile);
+}
+
+WriteMakefile( NAME           => $pmname,
+               AUTHOR         => 'Magnus Lewis-Smith <mlewissmith@users.noreply.github.com>',
+               VERSION_FROM   => $pmfile,
+               ABSTRACT_FROM  => $pmfile,
+               LICENSE        => 'unrestricted',
+               EXE_FILES      => [ glob "./bin/*" ],
+               PL_FILES       => \%pl_files,
+    );
