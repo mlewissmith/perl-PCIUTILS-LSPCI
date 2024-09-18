@@ -1,5 +1,8 @@
+CHANGELOG
 contrib/pciutils_lspci.pl
+DISTFILES.PL
 lib/PCIUTILS/LSPCI.pm
 Makefile.PL
 MANIFEST
 README
+VERSION
