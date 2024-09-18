@@ -11,7 +11,7 @@ use ExtUtils::MakeMaker;
 use Data::Dumper;
 
 my $pmname = 'PCIUTILS::LSPCI';
-my $pmfile = 'lib/PCIUTILS::LSPCI.pm';
+my $pmfile = 'lib/PCIUTILS/LSPCI.pm';
 my %pl_files;
 
 ## Distribution files which can be built *without* appealing to git
