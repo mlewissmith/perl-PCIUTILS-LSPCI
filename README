@@ -1,41 +1,6 @@
-v1.0.0
-
-NAME
+Name:
     PCIUTILS::LSPCI - perl postprocess `lspci` output
 
-SYNOPSIS
-        use PCIUTILS::LSPCI;
-
-        $obj = PCIUTILS::LSPCI->new;
-        $lspci = $obj->get_lspci;
-
-        ## Equivalent to `lspci -D -n`
-        for $record (@$lspci) {
-            $s = $record->{Slot};
-            $v = $record->{Vendor};
-            $d = $record->{Device};
-            $c = $record->{Class};
-            $r = $record->{Rev};
-            print "$s $c: $v:$d";
-            print " (rev $r)" if defined $r;
-            print "\n";
-        }
-
-DESCRIPTION
+Description:
     Provide perl interface to PCI information as returned by lspci(1).
-
-  Methods
-    new Constructor. Build lspci internal hash.
-
-    get_lspci
-        Parsed output from "lspci", returned as arrayref:
-
-        Note: the lspci hash is built at contruction time, see "Internals".
-
-  Internals
-    _lspci
-        Run "lspci -D -n -vmm", parse, return arrayref.
-
-SEE ALSO
-    lspci(1)
 
